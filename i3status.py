@@ -22,24 +22,39 @@ def grad(percent, start_color=GOOD_COLOR, end_color=BAD_COLOR):
 def grad_label(text, percent, sep=True, margin=1):
     margin_str = ' ' * margin
     text = margin_str + text + margin_str
-    cutoff = round((100 - percent) / 100 * len(text))
+
+    cutoff = (100 - percent) / 100 * len(text)
+
+    last_solid = math.floor(cutoff)
+    first_empty = math.ceil(cutoff)
+    remainder = cutoff - last_solid
 
     rv = [
         {
-            "full_text": text[:cutoff],
+            "full_text": text[:last_solid],
             "color": "#000000",
             "background": GOOD_COLOR_HEX,
         },
     ]
 
-    if cutoff < len(text):
-        rv[-1]['separator'] = False
-        rv[-1]['separator_block_width'] = 0
+    if remainder > 0:
         rv.append({
-            "full_text": text[cutoff:],
+            "full_text": text[last_solid:first_empty],
+            "color": "#000000",
+            "background": grad(remainder * 100),
+        });
+
+
+    if first_empty < len(text):
+        rv.append({
+            "full_text": text[first_empty:],
             "color": "#000000",
             "background": BAD_COLOR_HEX,
         })
+
+    for i in range(0, len(rv) - 1):
+        rv[i]['separator'] = False
+        rv[i]['separator_block_width'] = 0
 
     if not sep:
         rv[-1]['separator'] = False
@@ -80,7 +95,7 @@ def cpu_module():
     for i in range(0, len(load), 2):
         rv.append({
             "background": grad(load[i]),
-            "color": grad(load[i+1] if i+1 < len(load) else 0),
+            "color": grad(load[i+1]) if i+1 < len(load) else '#000000',
             "full_text": "\u2584",
             "separator": False,
             "separator_block_width": 0,
