@@ -3,19 +3,53 @@ import math
 import time
 import json
 import datetime
+import sys
+
 
 from py3nvml import py3nvml
 py3nvml.nvmlInit()
 
-GOOD_COLOR = (102, 255, 102)
-GOOD_COLOR_HEX = f"#{GOOD_COLOR[0]:02x}{GOOD_COLOR[1]:02x}{GOOD_COLOR[2]:02x}"
-OK_COLOR = (255, 255, 102)
-OK_COLOR_HEX = f"#{OK_COLOR[0]:02x}{OK_COLOR[1]:02x}{OK_COLOR[2]:02x}"
-BAD_COLOR = (255, 102, 102)
-BAD_COLOR_HEX = f"#{BAD_COLOR[0]:02x}{BAD_COLOR[1]:02x}{BAD_COLOR[2]:02x}"
+def rgb_to_hex(color):
+    r, g, b = color
+    return f"#{r:02x}{g:02x}{b:02x}"
 
-def grad(percent, start_color=GOOD_COLOR, mid_color=OK_COLOR, end_color=BAD_COLOR):
-    percent = max(0, min(100, percent)) / 100  # Normalize
+LABEL_FG_COLOR = (0, 175, 255)
+LABEL_FG_COLOR_HEX = rgb_to_hex(LABEL_FG_COLOR)
+
+LIGHT_FG_COLOR = (170, 255, 255)
+DARK_FG_COLOR = (0, 0, 0)
+
+#BRIGHT_COLOR = (102, 255, 102)
+BRIGHT_COLOR = (95, 255, 255)
+BRIGHT_COLOR_HEX = rgb_to_hex(BRIGHT_COLOR)
+BRIGHT_COLOR_FG_HEX = rgb_to_hex(DARK_FG_COLOR)
+
+#MID_COLOR = (255, 255, 102)
+MID_COLOR = (0, 175, 255)
+
+#DARK_COLOR = (255, 102, 102)
+DARK_COLOR = (0, 45, 95)
+DARK_COLOR_HEX = rgb_to_hex(DARK_COLOR)
+DARK_COLOR_FG_HEX = rgb_to_hex(LIGHT_FG_COLOR)
+
+RX_COLOR = (102, 255, 102)
+RX_COLOR_HEX = rgb_to_hex(RX_COLOR)
+
+TX_COLOR = (255, 102, 102)
+TX_COLOR_HEX = f"#{TX_COLOR[0]:02x}{TX_COLOR[1]:02x}{TX_COLOR[2]:02x}"
+TX_COLOR_HEX = rgb_to_hex(TX_COLOR)
+
+def grad_bg(
+        percent,
+        start_color=BRIGHT_COLOR,
+        mid_color=MID_COLOR,
+        end_color=DARK_COLOR,
+        reverse=False,
+):
+    if reverse:
+        percent = max(0, min(100, percent)) / 100
+    else:
+        percent = max(0, min(100, 100 - percent)) / 100
     if percent < 0.5:
         # Interpolate between start and mid
         ratio = percent / 0.5
@@ -28,13 +62,37 @@ def grad(percent, start_color=GOOD_COLOR, mid_color=OK_COLOR, end_color=BAD_COLO
     r = int(a[0] + (b[0] - a[0]) * ratio)
     g = int(a[1] + (b[1] - a[1]) * ratio)
     b = int(a[2] + (b[2] - a[2]) * ratio)
-    return f'#{r:02x}{g:02x}{b:02x}'
 
-def grad_label(text, percent, sep=True, margin=1):
+    return r, g, b
+
+def grad_fg(br, bg, bb):
+    lum = 0.2126*br + 0.7152*bg + 0.0722*bb
+
+    if lum > 127:
+        return DARK_FG_COLOR
+
+    return LIGHT_FG_COLOR
+
+def grad_bg_fg(*args, **kwargs):
+    br, bg, bb = grad_bg(*args, **kwargs)
+    fr, fg, fb = grad_fg(br, bg, bb)
+
+    return f'#{br:02x}{bg:02x}{bb:02x}', \
+            f'#{fr:02x}{fg:02x}{fb:02x}'
+
+
+def grad(*args, **kwargs):
+    br, bg, bb = grad_bg(*args, **kwargs)
+    return f'#{br:02x}{bg:02x}{bb:02x}'
+
+def grad_label(text, percent, sep=True, margin=1, reverse=False):
     margin_str = ' ' * margin
     text = margin_str + text + margin_str
 
-    cutoff = (100 - percent) / 100 * len(text)
+    if reverse:
+        cutoff = (100 - percent) / 100 * len(text)
+    else:
+        cutoff = percent / 100 * len(text)
 
     last_solid = math.floor(cutoff)
     first_empty = math.ceil(cutoff)
@@ -43,24 +101,25 @@ def grad_label(text, percent, sep=True, margin=1):
     rv = [
         {
             "full_text": text[:last_solid],
-            "color": "#000000",
-            "background": GOOD_COLOR_HEX,
+            "color": BRIGHT_COLOR_FG_HEX,
+            "background": BRIGHT_COLOR_HEX,
         },
     ]
 
     if remainder > 0:
+        bg, fg = grad_bg_fg(remainder * 100, reverse=reverse)
         rv.append({
             "full_text": text[last_solid:first_empty],
-            "color": "#000000",
-            "background": grad(remainder * 100),
+            "color": fg,
+            "background": bg,
         });
 
 
     if first_empty < len(text):
         rv.append({
             "full_text": text[first_empty:],
-            "color": "#000000",
-            "background": BAD_COLOR_HEX,
+            "color": DARK_COLOR_FG_HEX,
+            "background": DARK_COLOR_HEX,
         })
 
     for i in range(0, len(rv) - 1):
@@ -69,13 +128,12 @@ def grad_label(text, percent, sep=True, margin=1):
 
     if not sep:
         rv[-1]['separator'] = False
-        rv[-1]['separator_block_width'] = 0
 
     return rv
 
 
 def numformat(n, width=7):
-    units = [" ", " Ki", " Mi", " Gi", " Ti", " Pi", " Ei"]
+    units = [" ", " K", " M", " G", " T", " P", " E"]
     tier = max(int(math.log2(abs(n)) // 10) if n != 0 else 0, 0)
     scaled = n / (2 ** (tier * 10))
     digits = max(int(math.log10(abs(scaled))) if scaled != 0 else 0, 0)
@@ -85,6 +143,7 @@ def numformat(n, width=7):
 def clock_module():
     return [{
         "full_text": datetime.datetime.now().strftime("%a %Y-%m-%d %I:%M:%S %p"),
+        "color": LABEL_FG_COLOR_HEX
     }];
 
 def mem_module():
@@ -92,16 +151,16 @@ def mem_module():
     swap = psutil.swap_memory()
 
     return [
-        { "full_text": "ram", "separator": False },
-        *grad_label(f"{numformat(vmem.available, 8)}B", vmem.percent),
-        { "full_text": "swap", "separator": False },
-        *grad_label(f"{numformat(swap.free, 8)}B", swap.percent),
+        { "full_text": "ram", "separator": False, "color": LABEL_FG_COLOR_HEX },
+        *grad_label(f"{numformat(vmem.available, 7)}", vmem.percent, sep=False),
+        { "full_text": "swap", "separator": False, "color": LABEL_FG_COLOR_HEX },
+        *grad_label(f"{numformat(swap.free, 7)}", swap.percent, sep=False),
     ]
 
 def cpu_module():
     load = psutil.cpu_percent(percpu=True)
 
-    rv = [{ "full_text": "cpu", "separator": False }]
+    rv = [{ "full_text": "cpu", "separator": False, "color": LABEL_FG_COLOR_HEX }]
 
     for i in range(0, len(load), 2):
         rv.append({
@@ -112,9 +171,7 @@ def cpu_module():
             "separator_block_width": 0,
         })
 
-    rv[-1]['separator'] = True
     del rv[-1]['separator_block_width']
-
 
     return rv
 
@@ -138,10 +195,10 @@ def gpu_module(gpus=[0]):
         mem_avail = mem.total - mem.used
 
         rv += [
-            { "full_text": f'gpu{gpuIndex}', "separator": False },
-            *grad_label('          ', load.gpu),
-            { "full_text": f'vram{gpuIndex}', "separator": False },
-            *grad_label(f'{numformat(mem_avail, width=8)}B', mem_perc),
+            { "full_text": f'gpu{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
+            *grad_label('         ', load.gpu, sep=False),
+            { "full_text": f'vram{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
+            *grad_label(f'{numformat(mem_avail, width=7)}', mem_perc, sep=False),
         ]
 
     return rv
@@ -150,8 +207,8 @@ def disk_module(label, path):
     usage = psutil.disk_usage(path)
 
     return [
-        { "full_text": label, "separator": False },
-        *grad_label(f'{numformat(usage.free, 8)}B', usage.free / usage.total * 100)
+        { "full_text": label, "separator": False, "color": LABEL_FG_COLOR_HEX },
+        *grad_label(f'{numformat(usage.free, width=7)}', usage.free / usage.total * 100, sep=False)
     ]
 
 net_counters = {}
@@ -161,6 +218,7 @@ net_last = time.time()
 def time_adjusted_EWA(v, dt, pv, tau):
     sf = math.e**(-dt/tau)
     return  sf * pv + (1 - sf) * v
+
 
 def net_module(nics):
     global net_last # yeah i used a global fight me
@@ -180,34 +238,31 @@ def net_module(nics):
             "bytes_recv": counter.bytes_recv,
             "sent_rate_ewa": 0,
             "recv_rate_ewa": 0,
+            "sent_hwm": 1,
+            "recv_hwm": 1,
         })
 
         recv_rate = (counter.bytes_recv - last_counter.get('bytes_recv')) / interval
         sent_rate = (counter.bytes_sent - last_counter.get('bytes_sent')) / interval
-        recv_rate_ewa = time_adjusted_EWA(recv_rate, interval, last_counter.get('recv_rate_ewa'), 2)
-        sent_rate_ewa = time_adjusted_EWA(sent_rate, interval, last_counter.get('sent_rate_ewa'), 2)
+        recv_rate_ewa = time_adjusted_EWA(recv_rate, interval, last_counter.get('recv_rate_ewa'), 1)
+        sent_rate_ewa = time_adjusted_EWA(sent_rate, interval, last_counter.get('sent_rate_ewa'), 1)
+        sent_hwm = max(last_counter['sent_hwm'], sent_rate)
+        recv_hwm = max(last_counter['recv_hwm'], recv_rate)
 
         rv += [
-            { "full_text": nic, "separator": False },
+            { "full_text": nic, "separator": False, "color": LABEL_FG_COLOR_HEX },
             {
                 "full_text": f"\U0001f873",
                 "separator": False,
-                "color": GOOD_COLOR_HEX if recv_rate > 0 else None,
+                "color": RX_COLOR_HEX if recv_rate > 0 else "#606060",
             },
-            {
-                "full_text": f"{numformat(recv_rate_ewa, 7)}B/s",
-                "separator": False,
-                "color": GOOD_COLOR_HEX if recv_rate_ewa > 0 else None,
-            },
+            *grad_label(f"{numformat(recv_rate_ewa, 6)}", recv_rate_ewa / recv_hwm * 100, sep=False),
             {
                 "full_text": f"\U0001f871",
                 "separator": False,
-                "color": BAD_COLOR_HEX if sent_rate > 0 else None,
+                "color": TX_COLOR_HEX if sent_rate > 0 else "#606060",
             },
-            {
-                "full_text": f"{numformat(sent_rate_ewa, 7)}B/s",
-                "color": BAD_COLOR_HEX if sent_rate_ewa > 0 else None,
-            },
+            *grad_label(f"{numformat(sent_rate_ewa, 6)}", sent_rate_ewa / sent_hwm * 100, sep=False),
         ]
 
         net_counters[nic] = {
@@ -215,6 +270,8 @@ def net_module(nics):
             "bytes_recv": counter.bytes_recv,
             "sent_rate_ewa": sent_rate_ewa,
             "recv_rate_ewa": recv_rate_ewa,
+            "sent_hwm": sent_hwm,
+            "recv_hwm": recv_hwm,
         }
 
     net_last = now
