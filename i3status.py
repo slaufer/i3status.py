@@ -9,14 +9,25 @@ py3nvml.nvmlInit()
 
 GOOD_COLOR = (102, 255, 102)
 GOOD_COLOR_HEX = f"#{GOOD_COLOR[0]:02x}{GOOD_COLOR[1]:02x}{GOOD_COLOR[2]:02x}"
+OK_COLOR = (255, 255, 102)
+OK_COLOR_HEX = f"#{OK_COLOR[0]:02x}{OK_COLOR[1]:02x}{OK_COLOR[2]:02x}"
 BAD_COLOR = (255, 102, 102)
 BAD_COLOR_HEX = f"#{BAD_COLOR[0]:02x}{BAD_COLOR[1]:02x}{BAD_COLOR[2]:02x}"
 
-def grad(percent, start_color=GOOD_COLOR, end_color=BAD_COLOR):
+def grad(percent, start_color=GOOD_COLOR, mid_color=OK_COLOR, end_color=BAD_COLOR):
     percent = max(0, min(100, percent)) / 100  # Normalize
-    r = int(start_color[0] + (end_color[0] - start_color[0]) * percent)
-    g = int(start_color[1] + (end_color[1] - start_color[1]) * percent)
-    b = int(start_color[2] + (end_color[2] - start_color[2]) * percent)
+    if percent < 0.5:
+        # Interpolate between start and mid
+        ratio = percent / 0.5
+        a, b = start_color, mid_color
+    else:
+        # Interpolate between mid and end
+        ratio = (percent - 0.5) / 0.5
+        a, b = mid_color, end_color
+
+    r = int(a[0] + (b[0] - a[0]) * ratio)
+    g = int(a[1] + (b[1] - a[1]) * ratio)
+    b = int(a[2] + (b[2] - a[2]) * ratio)
     return f'#{r:02x}{g:02x}{b:02x}'
 
 def grad_label(text, percent, sep=True, margin=1):
