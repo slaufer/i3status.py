@@ -297,7 +297,10 @@ def marquee(text, i, width):
 
 
 def media_module(i, width):
-    name = next(name for name in bus.get(".DBus").ListNames() if name.startswith("org.mpris.MediaPlayer2"))
+    name = next((name for name in bus.get(".DBus").ListNames() if name.startswith("org.mpris.MediaPlayer2")), None)
+    if name is None:
+        return []
+
     player = bus.get(name, "/org/mpris/MediaPlayer2")
     metadata = player.Metadata
 
