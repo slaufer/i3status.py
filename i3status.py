@@ -28,7 +28,7 @@ BRIGHT_COLOR_FG_HEX = rgb_to_hex(DARK_FG_COLOR)
 MID_COLOR = (0, 175, 255)
 
 #DARK_COLOR = (255, 102, 102)
-DARK_COLOR = (0, 45, 95)
+DARK_COLOR = (0, 47, 95)
 DARK_COLOR_HEX = rgb_to_hex(DARK_COLOR)
 DARK_COLOR_FG_HEX = rgb_to_hex(LIGHT_FG_COLOR)
 
@@ -133,7 +133,7 @@ def grad_label(text, percent, sep=True, margin=1, reverse=False):
 
 
 def numformat(n, width=7):
-    units = [" ", " K", " M", " G", " T", " P", " E"]
+    units = ["", " K", " M", " G", " T", " P", " E"]
     tier = max(int(math.log2(abs(n)) // 10) if n != 0 else 0, 0)
     scaled = n / (2 ** (tier * 10))
     digits = max(int(math.log10(abs(scaled))) if scaled != 0 else 0, 0)
