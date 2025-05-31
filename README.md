@@ -18,6 +18,8 @@ It looks like this:
 ![It's my statusbar.](./screenshot.png)
 
 ## Install
+Make sure your you've installed your distro's pydbus package (e.g. `apt install python3-pydbus`)
+
 Clone the repo and set up the venv:
 ```
 git clone https://github.com/slaufer/i3status.py

@@ -7,7 +7,10 @@ import sys
 
 
 from py3nvml import py3nvml
+from pydbus import SessionBus
+
 py3nvml.nvmlInit()
+bus = SessionBus()
 
 def rgb_to_hex(color):
     r, g, b = color
@@ -252,13 +255,13 @@ def net_module(nics):
         rv += [
             { "full_text": nic, "separator": False, "color": LABEL_FG_COLOR_HEX },
             {
-                "full_text": f"\U0001f873",
+                "full_text": "\U0001f873",
                 "separator": False,
                 "color": RX_COLOR_HEX if recv_rate > 0 else "#606060",
             },
             *grad_label(f"{numformat(recv_rate_ewa, 6)}", recv_rate_ewa / recv_hwm * 100, sep=False),
             {
-                "full_text": f"\U0001f871",
+                "full_text": "\U0001f871",
                 "separator": False,
                 "color": TX_COLOR_HEX if sent_rate > 0 else "#606060",
             },
@@ -277,13 +280,60 @@ def net_module(nics):
     net_last = now
     return rv
 
+def marquee(text, i, width):
+    if len(text) <= width:
+        return text + (width - len(text)) * " "
+
+    text += " | "
+
+    begin = i % len(text)
+    end = begin + width
+    rv = text[begin:end]
+
+    if end > len(text):
+        rv += text[:end - len(text)]
+
+    return rv
+
+
+def media_module(i, width):
+    name = next(name for name in bus.get(".DBus").ListNames() if name.startswith("org.mpris.MediaPlayer2"))
+    player = bus.get(name, "/org/mpris/MediaPlayer2")
+    metadata = player.Metadata
+
+    media_name = ' - '.join([x for x in [
+        ', '.join(metadata.get("xesam:artist", [])),
+        metadata.get("xesam:album"),
+        metadata.get("xesam:title"),
+    ] if x is not None and x != ''])
+
+    if media_name == '' or media_name is None:
+        return []
+
+    # marqee text according to width and i
+    #text += " \u23f5 "
+
+    return [
+        { "full_text": "\U0001D11F", "color": LABEL_FG_COLOR_HEX, "separator": False },
+        { "full_text": " " + marquee(media_name, i, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
+    ]
+
+def eq_module():
+    # ▂▃▄▅▆▇█
+    chars = [ ' ', '\u2581', '\u2582', '\u2583', '\u2584', '\u2585', '\u2586', '\u2587', '\u2588' ]
+
+    return [{ "full_text": ''.join(chars)}]
+
 
 def main():
     interval = 0.25
     print('{"version":1}\n[')
 
+    i = 0
+
     while True:
         status = [] \
+            + media_module(i, 50) \
             + net_module(["wlp14s0"]) \
             + disk_module("root", "/") \
             + gpu_module() \
@@ -291,6 +341,7 @@ def main():
             + mem_module() \
             + clock_module()
         print(json.dumps(status), ",")
+        i += 1
         time.sleep(interval)
 
 if __name__ == '__main__':
