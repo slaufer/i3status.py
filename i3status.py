@@ -280,13 +280,13 @@ def net_module(nics):
     net_last = now
     return rv
 
-def marquee(text, i, width):
+def marquee(text, width, rate=0.25, separator=' | '):
     if len(text) <= width:
         return text + (width - len(text)) * " "
 
-    text += " | "
+    text += separator
 
-    begin = i % len(text)
+    begin = math.floor(time.time() / rate) % len(text)
     end = begin + width
     rv = text[begin:end]
 
@@ -295,8 +295,7 @@ def marquee(text, i, width):
 
     return rv
 
-
-def media_module(i, width):
+def media_module(width):
     name = next((name for name in bus.get(".DBus").ListNames() if name.startswith("org.mpris.MediaPlayer2")), None)
     if name is None:
         return []
@@ -317,8 +316,8 @@ def media_module(i, width):
     #text += " \u23f5 "
 
     return [
-        { "full_text": "\U0001D11F", "color": LABEL_FG_COLOR_HEX, "separator": False },
-        { "full_text": " " + marquee(media_name, i, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
+        { "full_text": "\u25b6", "color": LABEL_FG_COLOR_HEX, "separator": False },
+        { "full_text": " " + marquee(media_name, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
     ]
 
 def eq_module():
@@ -336,7 +335,7 @@ def main():
 
     while True:
         status = [] \
-            + media_module(i, 50) \
+            + media_module(50) \
             + net_module(["wlp14s0"]) \
             + disk_module("root", "/") \
             + gpu_module() \
