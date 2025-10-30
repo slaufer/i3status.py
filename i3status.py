@@ -5,6 +5,7 @@ import json
 import datetime
 import sys
 import traceback
+import subprocess
 
 
 from py3nvml import py3nvml
@@ -324,6 +325,46 @@ def media_module(width):
         { "full_text": " " + marquee(media_name, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
     ]
 
+mullvad_cache = None
+mullvad_last_check = 0
+
+def mullvad_module():
+    global mullvad_cache, mullvad_last_check
+
+    now = time.time()
+
+    # Return cached value if within throttle period
+    if mullvad_cache is not None and (now - mullvad_last_check) < 2:
+        return mullvad_cache
+
+    # Execute and update cache
+    try:
+        result = subprocess.run(['mullvad', 'status'],
+                              capture_output=True,
+                              text=True)
+        status = result.stdout.strip()
+
+        if status.startswith('Connected'):
+            icon = "\U0001f512"  # 🔒 locked
+            color = BRIGHT_COLOR_HEX
+        else:
+            icon = "\U0000274C"  # ❌ unlocked
+            color = TX_COLOR_HEX
+
+        mullvad_cache = [{
+            "full_text": icon,
+            "color": color,
+            "separator": False,
+        }]
+        mullvad_last_check = now
+        return mullvad_cache
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as ex:
+        # If mullvad command fails or times out, return empty
+        print(ex)
+        mullvad_cache = []
+        mullvad_last_check = now
+        return []
+
 def eq_module():
     # ▂▃▄▅▆▇█
     chars = [ ' ', '\u2581', '\u2582', '\u2583', '\u2584', '\u2585', '\u2586', '\u2587', '\u2588' ]
@@ -339,6 +380,7 @@ def main():
     while True:
         status = [] \
             + media_module(50) \
+            + mullvad_module() \
             + net_module(["enp6s0"]) \
             + disk_module("root", "/") \
             + gpu_module() \
