@@ -4,6 +4,7 @@ import time
 import json
 import datetime
 import sys
+import traceback
 
 
 from py3nvml import py3nvml
@@ -136,7 +137,7 @@ def grad_label(text, percent, sep=True, margin=1, reverse=False):
 
 
 def numformat(n, width=7):
-    units = ["", " K", " M", " G", " T", " P", " E"]
+    units = [" B", " K", " M", " G", " T", " P", " E"]
     tier = max(int(math.log2(abs(n)) // 10) if n != 0 else 0, 0)
     scaled = n / (2 ** (tier * 10))
     digits = max(int(math.log10(abs(scaled))) if scaled != 0 else 0, 0)
@@ -300,8 +301,11 @@ def media_module(width):
     if name is None:
         return []
 
-    player = bus.get(name, "/org/mpris/MediaPlayer2")
-    metadata = player.Metadata
+    try:
+        player = bus.get(name, "/org/mpris/MediaPlayer2")
+        metadata = player.Metadata
+    except:
+        return []
 
     media_name = ' - '.join([x for x in [
         ', '.join(metadata.get("xesam:artist", [])),
@@ -326,7 +330,6 @@ def eq_module():
 
     return [{ "full_text": ''.join(chars)}]
 
-
 def main():
     interval = 0.25
     print('{"version":1}\n[')
@@ -336,7 +339,7 @@ def main():
     while True:
         status = [] \
             + media_module(50) \
-            + net_module(["wlp14s0"]) \
+            + net_module(["enp6s0"]) \
             + disk_module("root", "/") \
             + gpu_module() \
             + cpu_module() \
@@ -347,4 +350,8 @@ def main():
         time.sleep(interval)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        with open("i3status_errors.txt", "w") as f:
+            f.write(traceback.format_exc())
