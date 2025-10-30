@@ -347,15 +347,38 @@ def mullvad_module():
         if status.startswith('Connected'):
             icon = "\U0001f512"  # 🔒 locked
             color = BRIGHT_COLOR_HEX
+
+            # Extract relay name from output
+            relay = None
+            for line in status.split('\n'):
+                if 'Relay:' in line:
+                    relay = line.split('Relay:')[1].strip()
+                    break
+
+            rv = [{
+                "full_text": icon,
+                "color": color,
+                "separator": False,
+            }]
+
+            if relay:
+                rv.append({
+                    "full_text": f"{relay}",
+                    "color": LABEL_FG_COLOR_HEX,
+                    "separator": False,
+                })
+
+            mullvad_cache = rv
         else:
             icon = "\U0000274C"  # ❌ unlocked
             color = TX_COLOR_HEX
 
-        mullvad_cache = [{
-            "full_text": icon,
-            "color": color,
-            "separator": False,
-        }]
+            mullvad_cache = [{
+                "full_text": icon,
+                "color": color,
+                "separator": False,
+            }]
+
         mullvad_last_check = now
         return mullvad_cache
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as ex:
