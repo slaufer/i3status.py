@@ -201,7 +201,7 @@ def gpu_module(gpus=[0]):
 
         rv += [
             { "full_text": f'gpu{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
-            *grad_label('         ', load.gpu, sep=False),
+            *grad_label(f'{str(load.gpu):>3}%', load.gpu, sep=False),
             { "full_text": f'vram{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
             *grad_label(f'{numformat(mem_avail, width=7)}', mem_perc, sep=False),
         ]
@@ -356,17 +356,17 @@ def mullvad_module():
                     break
 
             rv = [{
-                "full_text": icon,
-                "color": color,
+                "full_text": "VPN",
+                "color": LABEL_FG_COLOR_HEX,
                 "separator": False,
             }]
 
-            if relay:
-                rv.append({
-                    "full_text": f"{relay}",
-                    "color": LABEL_FG_COLOR_HEX,
-                    "separator": False,
-                })
+            rv.append({
+                "full_text": f" {relay or 'N/A'} ",
+                "color": BRIGHT_COLOR_HEX,
+                "background": DARK_COLOR_HEX,
+                "separator": False,
+            })
 
             mullvad_cache = rv
         else:
@@ -388,12 +388,6 @@ def mullvad_module():
         mullvad_last_check = now
         return []
 
-def eq_module():
-    # ▂▃▄▅▆▇█
-    chars = [ ' ', '\u2581', '\u2582', '\u2583', '\u2584', '\u2585', '\u2586', '\u2587', '\u2588' ]
-
-    return [{ "full_text": ''.join(chars)}]
-
 def main():
     interval = 0.25
     print('{"version":1}\n[')
@@ -402,7 +396,7 @@ def main():
 
     while True:
         status = [] \
-            + media_module(50) \
+            + media_module(35) \
             + mullvad_module() \
             + net_module(["enp6s0"]) \
             + disk_module("root", "/") \
