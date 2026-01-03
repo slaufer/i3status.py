@@ -201,7 +201,7 @@ def gpu_module(gpus=[0]):
 
         rv += [
             { "full_text": f'gpu{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
-            *grad_label(f'{str(load.gpu):>3}%', load.gpu, sep=False),
+            *grad_label(f'     ', load.gpu, sep=False),
             { "full_text": f'vram{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
             *grad_label(f'{numformat(mem_avail, width=7)}', mem_perc, sep=False),
         ]
