@@ -6,6 +6,7 @@ import datetime
 import sys
 import traceback
 import subprocess
+import re
 
 
 from py3nvml import py3nvml
@@ -325,6 +326,69 @@ def media_module(width):
         { "full_text": " " + marquee(media_name, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
     ]
 
+volume_cache = None
+volume_last_check = 0
+
+def volume_module():
+    global volume_cache, volume_last_check
+
+    now = time.time()
+
+    # Return cached value if within throttle period
+    if volume_cache is not None and (now - volume_last_check) < 0.25:
+        return volume_cache
+
+    try:
+        # Get volume
+        vol_result = subprocess.run(['pactl', 'get-sink-volume', '@DEFAULT_SINK@'],
+                                   capture_output=True,
+                                   text=True,
+                                   timeout=1)
+
+        # Get mute status
+        mute_result = subprocess.run(['pactl', 'get-sink-mute', '@DEFAULT_SINK@'],
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=1)
+
+        # Parse volume output like: "Volume: front-left: 65536 / 100% / 0.00 dB,   front-right: 65536 / 100% / 0.00 dB"
+        vol_output = vol_result.stdout.strip()
+
+        # Parse mute output like: "Mute: yes" or "Mute: no"
+        is_muted = 'yes' in mute_result.stdout.lower()
+
+        # Extract first percentage value
+        match = re.search(r'(\d+)%', vol_output)
+
+        if match:
+            volume_percent = int(match.group(1))
+            # Clamp to 100% for gradient display
+            display_percent = min(volume_percent, 100)
+
+            if is_muted:
+                rv = [
+                    { "full_text": "vol", "separator": False, "color": LABEL_FG_COLOR_HEX },
+                    *grad_label(f" MUTE ", display_percent, sep=False),
+                ]
+            else:
+                rv = [
+                    { "full_text": "vol", "separator": False, "color": LABEL_FG_COLOR_HEX },
+                    *grad_label(f" {volume_percent:3d}% ", display_percent, sep=False),
+                ]
+
+            volume_cache = rv
+            volume_last_check = now
+            return rv
+
+        volume_cache = []
+        volume_last_check = now
+        return []
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as ex:
+        volume_cache = []
+        volume_last_check = now
+        return []
+
 mullvad_cache = None
 mullvad_last_check = 0
 
@@ -397,6 +461,7 @@ def main():
     while True:
         status = [] \
             + media_module(35) \
+            + volume_module() \
             + mullvad_module() \
             + net_module(["enp6s0"]) \
             + disk_module("root", "/") \
