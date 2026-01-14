@@ -299,21 +299,32 @@ def marquee(text, width, rate=0.25, separator=' | '):
     return rv
 
 def media_module(width):
-    name = next((name for name in bus.get(".DBus").ListNames() if name.startswith("org.mpris.MediaPlayer2")), None)
-    if name is None:
-        return []
+    player_names = [
+        x for x  
+        in bus.get(".DBus").ListNames()
+        if x.startswith("org.mpris.MediaPlayer2")
+    ]
 
-    try:
-        player = bus.get(name, "/org/mpris/MediaPlayer2")
-        metadata = player.Metadata
-    except:
-        return []
+    media_name = None
 
-    media_name = ' - '.join([x for x in [
-        ', '.join(metadata.get("xesam:artist", [])),
-        metadata.get("xesam:album"),
-        metadata.get("xesam:title"),
-    ] if x is not None and x != ''])
+    for player_name in player_names:
+        try:
+            player = bus.get(player_name, "/org/mpris/MediaPlayer2")
+
+            if player.PlaybackStatus != "Playing":
+                continue
+
+            metadata = player.Metadata
+
+            media_name = ' - '.join([x for x in [
+                ', '.join(metadata.get("xesam:artist", [])),
+                metadata.get("xesam:album"),
+                metadata.get("xesam:title"),
+            ] if x is not None and x != ''])
+
+            break
+        except:
+            pass
 
     if media_name == '' or media_name is None:
         return []
