@@ -15,9 +15,11 @@ from pydbus import SessionBus
 py3nvml.nvmlInit()
 bus = SessionBus()
 
+
 def rgb_to_hex(color):
     r, g, b = color
     return f"#{r:02x}{g:02x}{b:02x}"
+
 
 LABEL_FG_COLOR = (0, 175, 255)
 LABEL_FG_COLOR_HEX = rgb_to_hex(LABEL_FG_COLOR)
@@ -25,15 +27,15 @@ LABEL_FG_COLOR_HEX = rgb_to_hex(LABEL_FG_COLOR)
 LIGHT_FG_COLOR = (170, 255, 255)
 DARK_FG_COLOR = (0, 0, 0)
 
-#BRIGHT_COLOR = (102, 255, 102)
+# BRIGHT_COLOR = (102, 255, 102)
 BRIGHT_COLOR = (95, 255, 255)
 BRIGHT_COLOR_HEX = rgb_to_hex(BRIGHT_COLOR)
 BRIGHT_COLOR_FG_HEX = rgb_to_hex(DARK_FG_COLOR)
 
-#MID_COLOR = (255, 255, 102)
+# MID_COLOR = (255, 255, 102)
 MID_COLOR = (0, 175, 255)
 
-#DARK_COLOR = (255, 102, 102)
+# DARK_COLOR = (255, 102, 102)
 DARK_COLOR = (0, 47, 95)
 DARK_COLOR_HEX = rgb_to_hex(DARK_COLOR)
 DARK_COLOR_FG_HEX = rgb_to_hex(LIGHT_FG_COLOR)
@@ -42,15 +44,15 @@ RX_COLOR = (102, 255, 102)
 RX_COLOR_HEX = rgb_to_hex(RX_COLOR)
 
 TX_COLOR = (255, 102, 102)
-TX_COLOR_HEX = f"#{TX_COLOR[0]:02x}{TX_COLOR[1]:02x}{TX_COLOR[2]:02x}"
 TX_COLOR_HEX = rgb_to_hex(TX_COLOR)
 
+
 def grad_bg(
-        percent,
-        start_color=BRIGHT_COLOR,
-        mid_color=MID_COLOR,
-        end_color=DARK_COLOR,
-        reverse=False,
+    percent,
+    start_color=BRIGHT_COLOR,
+    mid_color=MID_COLOR,
+    end_color=DARK_COLOR,
+    reverse=False,
 ):
     if reverse:
         percent = max(0, min(100, percent)) / 100
@@ -71,28 +73,30 @@ def grad_bg(
 
     return r, g, b
 
+
 def grad_fg(br, bg, bb):
-    lum = 0.2126*br + 0.7152*bg + 0.0722*bb
+    lum = 0.2126 * br + 0.7152 * bg + 0.0722 * bb
 
     if lum > 127:
         return DARK_FG_COLOR
 
     return LIGHT_FG_COLOR
 
+
 def grad_bg_fg(*args, **kwargs):
     br, bg, bb = grad_bg(*args, **kwargs)
     fr, fg, fb = grad_fg(br, bg, bb)
 
-    return f'#{br:02x}{bg:02x}{bb:02x}', \
-            f'#{fr:02x}{fg:02x}{fb:02x}'
+    return f"#{br:02x}{bg:02x}{bb:02x}", f"#{fr:02x}{fg:02x}{fb:02x}"
 
 
 def grad(*args, **kwargs):
     br, bg, bb = grad_bg(*args, **kwargs)
-    return f'#{br:02x}{bg:02x}{bb:02x}'
+    return f"#{br:02x}{bg:02x}{bb:02x}"
+
 
 def grad_label(text, percent, sep=True, margin=1, reverse=False):
-    margin_str = ' ' * margin
+    margin_str = " " * margin
     text = margin_str + text + margin_str
 
     if reverse:
@@ -114,26 +118,29 @@ def grad_label(text, percent, sep=True, margin=1, reverse=False):
 
     if remainder > 0:
         bg, fg = grad_bg_fg(remainder * 100, reverse=reverse)
-        rv.append({
-            "full_text": text[last_solid:first_empty],
-            "color": fg,
-            "background": bg,
-        });
-
+        rv.append(
+            {
+                "full_text": text[last_solid:first_empty],
+                "color": fg,
+                "background": bg,
+            }
+        )
 
     if first_empty < len(text):
-        rv.append({
-            "full_text": text[first_empty:],
-            "color": DARK_COLOR_FG_HEX,
-            "background": DARK_COLOR_HEX,
-        })
+        rv.append(
+            {
+                "full_text": text[first_empty:],
+                "color": DARK_COLOR_FG_HEX,
+                "background": DARK_COLOR_HEX,
+            }
+        )
 
     for i in range(0, len(rv) - 1):
-        rv[i]['separator'] = False
-        rv[i]['separator_block_width'] = 0
+        rv[i]["separator"] = False
+        rv[i]["separator_block_width"] = 0
 
-    if not sep:
-        rv[-1]['separator'] = False
+    if not sep and rv:
+        rv[-1]["separator"] = False
 
     return rv
 
@@ -146,43 +153,51 @@ def numformat(n, width=7):
     decimals = width - (2 if scaled >= 0 else 3) - digits - len(units[tier])
     return f"{scaled:.{max(decimals, 0)}f}{units[tier]}".rjust(width)
 
+
 def clock_module():
-    return [{
-        "full_text": datetime.datetime.now().strftime("%a %Y-%m-%d %I:%M:%S %p"),
-        "color": LABEL_FG_COLOR_HEX
-    }];
+    return [
+        {
+            "full_text": datetime.datetime.now().strftime("%a %Y-%m-%d %I:%M:%S %p"),
+            "color": LABEL_FG_COLOR_HEX,
+        }
+    ]
+
 
 def mem_module():
     vmem = psutil.virtual_memory()
     swap = psutil.swap_memory()
 
     return [
-        { "full_text": "ram", "separator": False, "color": LABEL_FG_COLOR_HEX },
+        {"full_text": "ram", "separator": False, "color": LABEL_FG_COLOR_HEX},
         *grad_label(f"{numformat(vmem.available, 7)}", vmem.percent, sep=False),
-        { "full_text": "swap", "separator": False, "color": LABEL_FG_COLOR_HEX },
+        {"full_text": "swap", "separator": False, "color": LABEL_FG_COLOR_HEX},
         *grad_label(f"{numformat(swap.free, 7)}", swap.percent, sep=False),
     ]
+
 
 def cpu_module():
     load = psutil.cpu_percent(percpu=True)
 
-    rv = [{ "full_text": "cpu", "separator": False, "color": LABEL_FG_COLOR_HEX }]
+    rv = [{"full_text": "cpu", "separator": False, "color": LABEL_FG_COLOR_HEX}]
 
     for i in range(0, len(load), 2):
-        rv.append({
-            "background": grad(load[i]),
-            "color": grad(load[i+1]) if i+1 < len(load) else '#000000',
-            "full_text": "\u2584",
-            "separator": False,
-            "separator_block_width": 0,
-        })
+        rv.append(
+            {
+                "background": grad(load[i]),
+                "color": grad(load[i + 1]) if i + 1 < len(load) else "#000000",
+                "full_text": "\u2584",
+                "separator": False,
+                "separator_block_width": 0,
+            }
+        )
 
-    del rv[-1]['separator_block_width']
+    del rv[-1]["separator_block_width"]
 
     return rv
 
 
 gpu_handles = {}
+
 
 def gpu_module(gpus=[0]):
     rv = []
@@ -201,33 +216,49 @@ def gpu_module(gpus=[0]):
         mem_avail = mem.total - mem.used
 
         rv += [
-            { "full_text": f'gpu{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
-            *grad_label(f'     ', load.gpu, sep=False),
-            { "full_text": f'vram{gpuIndex}', "separator": False, "color": LABEL_FG_COLOR_HEX },
-            *grad_label(f'{numformat(mem_avail, width=7)}', mem_perc, sep=False),
+            {
+                "full_text": f"gpu{gpuIndex}",
+                "separator": False,
+                "color": LABEL_FG_COLOR_HEX,
+            },
+            *grad_label(f"     ", load.gpu, sep=False),
+            {
+                "full_text": f"vram{gpuIndex}",
+                "separator": False,
+                "color": LABEL_FG_COLOR_HEX,
+            },
+            *grad_label(f"{numformat(mem_avail, width=7)}", mem_perc, sep=False),
         ]
 
     return rv
+
 
 def disk_module(label, path):
     usage = psutil.disk_usage(path)
 
     return [
-        { "full_text": label, "separator": False, "color": LABEL_FG_COLOR_HEX },
-        *grad_label(f'{numformat(usage.free, width=7)}', usage.free / usage.total * 100, sep=False)
+        {"full_text": label, "separator": False, "color": LABEL_FG_COLOR_HEX},
+        *grad_label(
+            f"{numformat(usage.free, width=7)}",
+            usage.percent,
+            sep=False,
+        ),
     ]
+
 
 net_counters = {}
 net_counters_beta = 0.9
 net_last = time.time()
 
+
 def time_adjusted_EWA(v, dt, pv, tau):
-    sf = math.e**(-dt/tau)
-    return  sf * pv + (1 - sf) * v
+    sf = math.e ** (-dt / tau)
+    return sf * pv + (1 - sf) * v
 
 
 def net_module(nics):
-    global net_last # yeah i used a global fight me
+    global net_counters
+    global net_last  # yeah i used a global fight me
     counters = psutil.net_io_counters(pernic=True)
     now = time.time()
     interval = now - net_last
@@ -239,36 +270,51 @@ def net_module(nics):
         if counter is None:
             continue
 
-        last_counter = net_counters.get(nic, {
-            "bytes_sent": counter.bytes_sent,
-            "bytes_recv": counter.bytes_recv,
-            "sent_rate_ewa": 0,
-            "recv_rate_ewa": 0,
-            "sent_hwm": 1,
-            "recv_hwm": 1,
-        })
+        last_counter = net_counters.get(
+            nic,
+            {
+                "bytes_sent": counter.bytes_sent,
+                "bytes_recv": counter.bytes_recv,
+                "sent_rate_ewa": 0,
+                "recv_rate_ewa": 0,
+                "sent_hwm": 1,
+                "recv_hwm": 1,
+            },
+        )
 
-        recv_rate = (counter.bytes_recv - last_counter.get('bytes_recv')) / interval
-        sent_rate = (counter.bytes_sent - last_counter.get('bytes_sent')) / interval
-        recv_rate_ewa = time_adjusted_EWA(recv_rate, interval, last_counter.get('recv_rate_ewa'), 1)
-        sent_rate_ewa = time_adjusted_EWA(sent_rate, interval, last_counter.get('sent_rate_ewa'), 1)
-        sent_hwm = max(last_counter['sent_hwm'], sent_rate)
-        recv_hwm = max(last_counter['recv_hwm'], recv_rate)
+        recv_rate = (counter.bytes_recv - last_counter.get("bytes_recv")) / interval
+        sent_rate = (counter.bytes_sent - last_counter.get("bytes_sent")) / interval
+        recv_rate_ewa = time_adjusted_EWA(
+            recv_rate, interval, last_counter.get("recv_rate_ewa"), 1
+        )
+        sent_rate_ewa = time_adjusted_EWA(
+            sent_rate, interval, last_counter.get("sent_rate_ewa"), 1
+        )
+        sent_hwm = max(last_counter["sent_hwm"], sent_rate)
+        recv_hwm = max(last_counter["recv_hwm"], recv_rate)
 
         rv += [
-            { "full_text": nic, "separator": False, "color": LABEL_FG_COLOR_HEX },
+            {"full_text": nic, "separator": False, "color": LABEL_FG_COLOR_HEX},
             {
                 "full_text": "\U0001f873",
                 "separator": False,
                 "color": RX_COLOR_HEX if recv_rate > 0 else "#606060",
             },
-            *grad_label(f"{numformat(recv_rate_ewa, 6)}", recv_rate_ewa / recv_hwm * 100, sep=False),
+            *grad_label(
+                f"{numformat(recv_rate_ewa, 6)}",
+                recv_rate_ewa / recv_hwm * 100,
+                sep=False,
+            ),
             {
                 "full_text": "\U0001f871",
                 "separator": False,
                 "color": TX_COLOR_HEX if sent_rate > 0 else "#606060",
             },
-            *grad_label(f"{numformat(sent_rate_ewa, 6)}", sent_rate_ewa / sent_hwm * 100, sep=False),
+            *grad_label(
+                f"{numformat(sent_rate_ewa, 6)}",
+                sent_rate_ewa / sent_hwm * 100,
+                sep=False,
+            ),
         ]
 
         net_counters[nic] = {
@@ -283,7 +329,8 @@ def net_module(nics):
     net_last = now
     return rv
 
-def marquee(text, width, rate=0.25, separator=' | '):
+
+def marquee(text, width, rate=0.25, separator=" | "):
     if len(text) <= width:
         return text + (width - len(text)) * " "
 
@@ -294,14 +341,15 @@ def marquee(text, width, rate=0.25, separator=' | '):
     rv = text[begin:end]
 
     if end > len(text):
-        rv += text[:end - len(text)]
+        rv += text[: end - len(text)]
 
     return rv
 
+
 def media_module(width):
     player_names = [
-        x for x  
-        in bus.get(".DBus").ListNames()
+        x
+        for x in bus.get(".DBus").ListNames()
         if x.startswith("org.mpris.MediaPlayer2")
     ]
 
@@ -316,29 +364,42 @@ def media_module(width):
 
             metadata = player.Metadata
 
-            media_name = ' - '.join([x for x in [
-                ', '.join(metadata.get("xesam:artist", [])),
-                metadata.get("xesam:album"),
-                metadata.get("xesam:title"),
-            ] if x is not None and x != ''])
+            media_name = " - ".join(
+                [
+                    x
+                    for x in [
+                        ", ".join(metadata.get("xesam:artist", [])),
+                        metadata.get("xesam:album"),
+                        metadata.get("xesam:title"),
+                    ]
+                    if x is not None and x != ""
+                ]
+            )
 
             break
-        except:
+        except Exception as ex:
             pass
 
-    if media_name == '' or media_name is None:
+    if media_name == "" or media_name is None:
         return []
 
     # marqee text according to width and i
-    #text += " \u23f5 "
+    # text += " \u23f5 "
 
     return [
-        { "full_text": "\u25b6", "color": LABEL_FG_COLOR_HEX, "separator": False },
-        { "full_text": " " + marquee(media_name, width) + " ", "separator": False, "color": BRIGHT_COLOR_HEX, "background": DARK_COLOR_HEX },
+        {"full_text": "\u25b6", "color": LABEL_FG_COLOR_HEX, "separator": False},
+        {
+            "full_text": " " + marquee(media_name, width) + " ",
+            "separator": False,
+            "color": BRIGHT_COLOR_HEX,
+            "background": DARK_COLOR_HEX,
+        },
     ]
+
 
 volume_cache = None
 volume_last_check = 0
+
 
 def volume_module():
     global volume_cache, volume_last_check
@@ -351,25 +412,29 @@ def volume_module():
 
     try:
         # Get volume
-        vol_result = subprocess.run(['pactl', 'get-sink-volume', '@DEFAULT_SINK@'],
-                                   capture_output=True,
-                                   text=True,
-                                   timeout=1)
+        vol_result = subprocess.run(
+            ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
 
         # Get mute status
-        mute_result = subprocess.run(['pactl', 'get-sink-mute', '@DEFAULT_SINK@'],
-                                    capture_output=True,
-                                    text=True,
-                                    timeout=1)
+        mute_result = subprocess.run(
+            ["pactl", "get-sink-mute", "@DEFAULT_SINK@"],
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
 
         # Parse volume output like: "Volume: front-left: 65536 / 100% / 0.00 dB,   front-right: 65536 / 100% / 0.00 dB"
         vol_output = vol_result.stdout.strip()
 
         # Parse mute output like: "Mute: yes" or "Mute: no"
-        is_muted = 'yes' in mute_result.stdout.lower()
+        is_muted = "yes" in mute_result.stdout.lower()
 
         # Extract first percentage value
-        match = re.search(r'(\d+)%', vol_output)
+        match = re.search(r"(\d+)%", vol_output)
 
         if match:
             volume_percent = int(match.group(1))
@@ -378,13 +443,21 @@ def volume_module():
 
             if is_muted:
                 rv = [
-                    { "full_text": "vol", "separator": False, "color": LABEL_FG_COLOR_HEX },
-                    *grad_label(f" MUTE ", display_percent, sep=False),
+                    {
+                        "full_text": "vol",
+                        "separator": False,
+                        "color": LABEL_FG_COLOR_HEX,
+                    },
+                    *grad_label(f"MUTE", display_percent, sep=False),
                 ]
             else:
                 rv = [
-                    { "full_text": "vol", "separator": False, "color": LABEL_FG_COLOR_HEX },
-                    *grad_label(f" {volume_percent:3d}% ", display_percent, sep=False),
+                    {
+                        "full_text": "vol",
+                        "separator": False,
+                        "color": LABEL_FG_COLOR_HEX,
+                    },
+                    *grad_label(f"{volume_percent:3d}%", display_percent, sep=False),
                 ]
 
             volume_cache = rv
@@ -400,8 +473,10 @@ def volume_module():
         volume_last_check = now
         return []
 
+
 mullvad_cache = None
 mullvad_last_check = 0
+
 
 def mullvad_module():
     global mullvad_cache, mullvad_last_check
@@ -414,54 +489,70 @@ def mullvad_module():
 
     # Execute and update cache
     try:
-        result = subprocess.run(['mullvad', 'status'],
-                              capture_output=True,
-                              text=True)
-        status = result.stdout.strip()
+        result = subprocess.run(
+            ["tailscale", "status", "--json"], capture_output=True, text=True
+        )
+        data = json.loads(result.stdout)
 
-        if status.startswith('Connected'):
-            icon = "\U0001f512"  # 🔒 locked
-            color = BRIGHT_COLOR_HEX
-
-            # Extract relay name from output
-            relay = None
-            for line in status.split('\n'):
-                if 'Relay:' in line:
-                    relay = line.split('Relay:')[1].strip()
+        # VPN is considered ON when an online Mullvad exit node is in use
+        exit_node = data.get("ExitNodeStatus") or {}
+        connected = False
+        relay = None
+        if exit_node.get("Online"):
+            exit_id = exit_node.get("ID")
+            for peer in (data.get("Peer") or {}).values():
+                if peer.get("ID") == exit_id:
+                    dns = (peer.get("DNSName") or "").rstrip(".")
+                    if dns.endswith(".mullvad.ts.net"):
+                        connected = True
+                        relay = peer.get("HostName")
                     break
 
-            rv = [{
-                "full_text": "VPN",
-                "color": LABEL_FG_COLOR_HEX,
-                "separator": False,
-            }]
+        if connected:
+            # icon = "\U0001f512"  # 🔒 locked
 
-            rv.append({
-                "full_text": f" {relay or 'N/A'} ",
-                "color": BRIGHT_COLOR_HEX,
-                "background": DARK_COLOR_HEX,
-                "separator": False,
-            })
-
-            mullvad_cache = rv
+            mullvad_cache = [
+                {
+                    "full_text": "VPN",
+                    "color": LABEL_FG_COLOR_HEX,
+                    "separator": False,
+                },
+                {
+                    # "full_text": f" {relay or 'N/A'} ",
+                    "full_text": " ON ",
+                    "color": DARK_COLOR_HEX,
+                    "background": BRIGHT_COLOR_HEX,
+                    "separator": False,
+                }
+            ]
         else:
-            icon = "\U0000274C"  # ❌ unlocked
-            color = TX_COLOR_HEX
+            # icon = "\U0000274c"  # ❌ unlocked
+            # color = TX_COLOR_HEX
 
-            mullvad_cache = [{
-                "full_text": icon,
-                "color": color,
-                "separator": False,
-            }]
+            mullvad_cache = [
+                {
+                    "full_text": "VPN",
+                    "color": LABEL_FG_COLOR_HEX,
+                    "separator": False,
+                },
+                {
+                    # "full_text": icon,
+                    # "color": color,
+                    "full_text": " OFF ",
+                    "color": BRIGHT_COLOR_HEX,
+                    "background": DARK_COLOR_HEX,
+                    "separator": False,
+                }
+            ]
 
         mullvad_last_check = now
         return mullvad_cache
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as ex:
-        # If mullvad command fails or times out, return empty
-        print(ex)
+        # If tailscale command fails or times out, return empty
         mullvad_cache = []
         mullvad_last_check = now
         return []
+
 
 def main():
     interval = 0.25
@@ -470,21 +561,25 @@ def main():
     i = 0
 
     while True:
-        status = [] \
-            + media_module(35) \
-            + volume_module() \
-            + mullvad_module() \
-            + net_module(["enp6s0"]) \
-            + disk_module("root", "/") \
-            + gpu_module() \
-            + cpu_module() \
-            + mem_module() \
+        status = (
+            []
+            + media_module(35)
+            + volume_module()
+            + mullvad_module()
+            + net_module(["enp6s0"])
+            + disk_module("root", "/")
+            + disk_module("stor", "/mnt/stor-ssd")
+            + gpu_module()
+            + cpu_module()
+            + mem_module()
             + clock_module()
+        )
         print(json.dumps(status), ",")
         i += 1
         time.sleep(interval)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         main()
     except Exception as e:

@@ -1,2 +1,6 @@
 /venv
 i3status_errors.txt
+/openspec
+.claude
+.opencode
+__pycache__
