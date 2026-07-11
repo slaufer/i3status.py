@@ -494,11 +494,14 @@ def mullvad_module():
         )
         data = json.loads(result.stdout)
 
-        # VPN is considered ON when an online Mullvad exit node is in use
+        # VPN is considered ON when the backend is running and an online
+        # Mullvad exit node is in use. BackendState is checked because
+        # ExitNodeStatus.Online reflects the peer's reachability in the
+        # tailnet and stays True even after `tailscale down`.
         exit_node = data.get("ExitNodeStatus") or {}
         connected = False
         relay = None
-        if exit_node.get("Online"):
+        if data.get("BackendState") == "Running" and exit_node.get("Online"):
             exit_id = exit_node.get("ID")
             for peer in (data.get("Peer") or {}).values():
                 if peer.get("ID") == exit_id:
