@@ -21,39 +21,94 @@ def rgb_to_hex(color):
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-LABEL_FG_COLOR = (0, 175, 255)
-LABEL_FG_COLOR_HEX = rgb_to_hex(LABEL_FG_COLOR)
+# Default colors. Each can be overridden by an X resource i3status.<name>
+# (e.g. "i3status.bright: #ffaf00"), which is re-read every few seconds so
+# colors can be switched while running (see ~/.config/i3/colors-*.Xresources).
+DEFAULT_COLORS = {
+    "label_fg": (0, 175, 255),
+    "light_fg": (170, 255, 255),
+    "dark_fg": (0, 0, 0),
+    "bright": (95, 255, 255),  # alt: (102, 255, 102)
+    "mid": (0, 175, 255),  # alt: (255, 255, 102)
+    "dark": (0, 47, 95),  # alt: (255, 102, 102)
+    "rx": (102, 255, 102),
+    "tx": (255, 102, 102),
+    "idle": (96, 96, 96),
+}
 
-LIGHT_FG_COLOR = (170, 255, 255)
-DARK_FG_COLOR = (0, 0, 0)
 
-# BRIGHT_COLOR = (102, 255, 102)
-BRIGHT_COLOR = (95, 255, 255)
-BRIGHT_COLOR_HEX = rgb_to_hex(BRIGHT_COLOR)
-BRIGHT_COLOR_FG_HEX = rgb_to_hex(DARK_FG_COLOR)
+def apply_colors(colors):
+    global LABEL_FG_COLOR_HEX, LIGHT_FG_COLOR, DARK_FG_COLOR
+    global BRIGHT_COLOR, BRIGHT_COLOR_HEX, BRIGHT_COLOR_FG_HEX
+    global MID_COLOR, DARK_COLOR, DARK_COLOR_HEX, DARK_COLOR_FG_HEX
+    global RX_COLOR_HEX, TX_COLOR_HEX, IDLE_COLOR_HEX
 
-# MID_COLOR = (255, 255, 102)
-MID_COLOR = (0, 175, 255)
+    LABEL_FG_COLOR_HEX = rgb_to_hex(colors["label_fg"])
+    LIGHT_FG_COLOR = colors["light_fg"]
+    DARK_FG_COLOR = colors["dark_fg"]
+    BRIGHT_COLOR = colors["bright"]
+    BRIGHT_COLOR_HEX = rgb_to_hex(BRIGHT_COLOR)
+    BRIGHT_COLOR_FG_HEX = rgb_to_hex(DARK_FG_COLOR)
+    MID_COLOR = colors["mid"]
+    DARK_COLOR = colors["dark"]
+    DARK_COLOR_HEX = rgb_to_hex(DARK_COLOR)
+    DARK_COLOR_FG_HEX = rgb_to_hex(LIGHT_FG_COLOR)
+    RX_COLOR_HEX = rgb_to_hex(colors["rx"])
+    TX_COLOR_HEX = rgb_to_hex(colors["tx"])
+    IDLE_COLOR_HEX = rgb_to_hex(colors["idle"])
 
-# DARK_COLOR = (255, 102, 102)
-DARK_COLOR = (0, 47, 95)
-DARK_COLOR_HEX = rgb_to_hex(DARK_COLOR)
-DARK_COLOR_FG_HEX = rgb_to_hex(LIGHT_FG_COLOR)
 
-RX_COLOR = (102, 255, 102)
-RX_COLOR_HEX = rgb_to_hex(RX_COLOR)
+def read_xresource_colors():
+    """DEFAULT_COLORS with any valid i3status.* X resources applied."""
+    colors = dict(DEFAULT_COLORS)
 
-TX_COLOR = (255, 102, 102)
-TX_COLOR_HEX = rgb_to_hex(TX_COLOR)
+    try:
+        result = subprocess.run(
+            ["xrdb", "-query"], capture_output=True, text=True, timeout=1
+        )
+    except Exception:
+        return colors
+
+    for line in result.stdout.splitlines():
+        match = re.fullmatch(r"i3status\.(\w+):\s*#([0-9a-fA-F]{6})\s*", line)
+        if match and match.group(1) in colors:
+            value = match.group(2)
+            colors[match.group(1)] = tuple(
+                int(value[i : i + 2], 16) for i in (0, 2, 4)
+            )
+
+    return colors
+
+
+colors_last_check = 0
+
+
+def update_colors():
+    global colors_last_check
+
+    now = time.time()
+
+    if now - colors_last_check < 2:
+        return
+
+    apply_colors(read_xresource_colors())
+    colors_last_check = now
+
+
+apply_colors(DEFAULT_COLORS)
 
 
 def grad_bg(
     percent,
-    start_color=BRIGHT_COLOR,
-    mid_color=MID_COLOR,
-    end_color=DARK_COLOR,
+    start_color=None,
+    mid_color=None,
+    end_color=None,
     reverse=False,
 ):
+    start_color = start_color or BRIGHT_COLOR
+    mid_color = mid_color or MID_COLOR
+    end_color = end_color or DARK_COLOR
+
     if reverse:
         percent = max(0, min(100, percent)) / 100
     else:
@@ -298,7 +353,7 @@ def net_module(nics):
             {
                 "full_text": "\U0001f873",
                 "separator": False,
-                "color": RX_COLOR_HEX if recv_rate > 0 else "#606060",
+                "color": RX_COLOR_HEX if recv_rate > 0 else IDLE_COLOR_HEX,
             },
             *grad_label(
                 f"{numformat(recv_rate_ewa, 6)}",
@@ -308,7 +363,7 @@ def net_module(nics):
             {
                 "full_text": "\U0001f871",
                 "separator": False,
-                "color": TX_COLOR_HEX if sent_rate > 0 else "#606060",
+                "color": TX_COLOR_HEX if sent_rate > 0 else IDLE_COLOR_HEX,
             },
             *grad_label(
                 f"{numformat(sent_rate_ewa, 6)}",
@@ -564,6 +619,7 @@ def main():
     i = 0
 
     while True:
+        update_colors()
         status = (
             []
             + media_module(35)
